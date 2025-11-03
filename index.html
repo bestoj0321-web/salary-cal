@@ -1,0 +1,256 @@
+<!-- 생산직 월 급여 계산기 — 단일 HTML 파일
+사용법: 아래 내용을 파일로 저장하세요. 예: salary_calculator.html
+브라우저에서 파일을 열면 바로 작동합니다. (백엔드 불필요)
+-->
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>생산직 월 급여 계산기</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial}
+    body{background:#f3f4f6;color:#111;margin:0;padding:20px}
+    .container{max-width:900px;margin:0 auto;background:#fff;padding:20px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.08)}
+    h1{margin:0 0 8px;font-size:20px}
+    p.lead{margin:0 0 16px;color:#6b7280}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+    label{display:block;font-size:13px;color:#374151}
+    input[type=number]{width:100%;padding:8px;border-radius:6px;border:1px solid #d1d5db;margin-top:6px}
+    .card{background:#fafafa;padding:12px;border-radius:6px;border:1px solid #e5e7eb}
+    .muted{font-size:12px;color:#6b7280}
+    .big{font-size:18px;font-weight:700}
+    .btn{display:inline-block;padding:8px 12px;border-radius:6px;border:none;background:#111;color:#fff;cursor:pointer}
+    footer{margin-top:16px;font-size:13px;color:#6b7280}
+    details{margin-top:8px}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>생산직 월 급여 계산기</h1>
+    <p class="lead">백엔드 없이 실행 가능한 단일 HTML + JS 파일입니다. 입력을 바꾸면 실시간으로 결과가 갱신됩니다.</p>
+
+    <div class="grid" id="inputs">
+      <div>
+        <label>기본급 (원)
+          <input id="basicPay" type="number" value="1910000" />
+        </label>
+        <div class="muted">예: 1,910,000</div>
+      </div>
+
+      <div>
+        <label>총 상여 (%) — 입력 예: 800
+          <input id="totalBonusPct" type="number" value="800" />
+        </label>
+        <div class="muted">예: 800 입력 (100%당 1로 환산 → 800 → 8)</div>
+      </div>
+
+      <div>
+        <label>설/추석 상여 (%)
+          <input id="holidayBonusPct" type="number" value="80" />
+        </label>
+      </div>
+
+      <div>
+        <label>통상 상여 (%) — 입력 예: 800
+          <input id="regularBonusPct" type="number" value="800" />
+        </label>
+      </div>
+
+      <div>
+        <label>월 소정 근로시간
+          <input id="workHours" type="number" value="179" />
+        </label>
+        <div class="muted">예: 179 / 209 등 회사 기준</div>
+      </div>
+
+      <div>
+        <label>초과근로(OT) 시간
+          <input id="otHours" type="number" value="20" />
+        </label>
+      </div>
+
+      <div>
+        <label>야간 근로시간
+          <input id="nightHours" type="number" value="60" />
+        </label>
+      </div>
+
+      <div>
+        <label>기타수당 (원)
+          <input id="otherAllowances" type="number" value="0" />
+        </label>
+      </div>
+    </div>
+
+    <hr style="margin:16px 0" />
+
+    <div class="grid">
+      <div class="card">
+        <div class="muted">월 정기 상여 비율</div>
+        <div id="monthlyBonusRatio" class="big">0</div>
+        <div class="muted">월 정기 상여금</div>
+        <div id="monthlyBonus" class="big">0 원</div>
+        <div class="muted">월 기본급여</div>
+        <div id="monthlyBaseSalary" class="big">0 원</div>
+      </div>
+
+      <div class="card">
+        <div class="muted">시급 (원)</div>
+        <div id="hourly" class="big">0 원</div>
+        <div class="muted">OT 시급 (원)</div>
+        <div id="otHourly" class="big">0 원</div>
+        <div class="muted">OT 수당</div>
+        <div id="otPay" class="big">0 원</div>
+        <div class="muted">야간수당</div>
+        <div id="nightPay" class="big">0 원</div>
+      </div>
+
+      <div class="card" style="grid-column:1 / -1">
+        <div class="muted">세전 월 급여</div>
+        <div id="preTaxMonthly" class="big">0 원</div>
+        <div class="muted">세후(실수령)는 세금·4대보험·개인공제 등에 따라 달라집니다. 이 계산기는 세전 금액을 보여줍니다.</div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px" class="row">
+      <button id="downloadCsv" class="btn">CSV로 다운로드</button>
+      <button id="resetBtn" class="btn" style="background:#6b7280">초기화</button>
+    </div>
+
+    <details>
+      <summary style="cursor:pointer;margin-top:8px">계산 공식 보기</summary>
+      <div style="margin-top:8px;font-size:13px;color:#374151">
+        <ul>
+          <li>월 정기 상여 비율 = ((총 상여% - 설/추석 상여%) ÷ 12) ÷ 100 (소수)</li>
+          <li>월 정기 상여금 = 기본급 × 월 정기 상여 비율</li>
+          <li>월 기본급여 = 기본급 + 월 정기 상여금</li>
+          <li>시급: 상여 있음 → ((통상 환산값 + 12) ÷ 12) × 기본급 ÷ 근로시수, 상여 없음 → 기본급 ÷ 근로시수</li>
+          <li>OT 시급 = 시급 × 1.5</li>
+          <li>야간수당 = 시급 × 0.5 × 야간 시간</li>
+          <li>세전 월 급여 = 월 기본급여 + OT + 야간 + 기타수당</li>
+        </ul>
+      </div>
+    </details>
+
+    <footer>
+      필요하면 이 파일에 세후 계산, 엑셀 형식 다운로드, 또는 다국어 지원을 추가해 드릴게요.
+    </footer>
+  </div>
+
+  <script>
+    // DOM 참조
+    const qs = (id) => document.getElementById(id);
+    const inputs = [ 'basicPay','totalBonusPct','holidayBonusPct','regularBonusPct','workHours','otHours','nightHours','otherAllowances' ].map(qs);
+
+    function fmt(n){ return typeof n === 'number' ? n.toLocaleString('ko-KR') : n }
+
+    function calculate(){
+      const basicPay = Number(qs('basicPay').value) || 0;
+      const totalBonusPct = Number(qs('totalBonusPct').value) || 0;
+      const holidayBonusPct = Number(qs('holidayBonusPct').value) || 0;
+      const regularBonusPct = Number(qs('regularBonusPct').value) || 0;
+      const workHours = Number(qs('workHours').value) || 0;
+      const otHours = Number(qs('otHours').value) || 0;
+      const nightHours = Number(qs('nightHours').value) || 0;
+      const otherAllowances = Number(qs('otherAllowances').value) || 0;
+
+      // 월 정기 상여 비율
+      const monthlyBonusRatio = ((totalBonusPct - holidayBonusPct) / 12) / 100; // 소수
+      const monthlyBonus = Math.round(basicPay * monthlyBonusRatio);
+      const monthlyBaseSalary = Math.round(basicPay + monthlyBonus);
+
+      const regularBonusFactor = regularBonusPct / 100;
+      const hasBonus = totalBonusPct > 0 || regularBonusPct > 0 || holidayBonusPct > 0;
+
+      let hourly;
+      if (hasBonus && workHours > 0){
+        const factor = (regularBonusFactor + 12) / 12;
+        hourly = (factor * basicPay) / workHours;
+      } else if (workHours > 0){
+        hourly = basicPay / workHours;
+      } else {
+        hourly = 0;
+      }
+
+      const otHourly = hourly * 1.5;
+      const otPay = otHourly * otHours;
+      const nightPay = hourly * 0.5 * nightHours;
+
+      const preTaxMonthly = Math.round(monthlyBaseSalary + otPay + nightPay + otherAllowances);
+
+      // 화면 표시
+      qs('monthlyBonusRatio').textContent = (monthlyBonusRatio * 100).toFixed(2) + ' %';
+      qs('monthlyBonus').textContent = fmt(monthlyBonus) + ' 원';
+      qs('monthlyBaseSalary').textContent = fmt(monthlyBaseSalary) + ' 원';
+
+      qs('hourly').textContent = fmt(Math.round(hourly)) + ' 원';
+      qs('otHourly').textContent = fmt(Math.round(otHourly)) + ' 원';
+      qs('otPay').textContent = fmt(Math.round(otPay)) + ' 원';
+      qs('nightPay').textContent = fmt(Math.round(nightPay)) + ' 원';
+
+      qs('preTaxMonthly').textContent = fmt(preTaxMonthly) + ' 원';
+
+      return {
+        basicPay, totalBonusPct, holidayBonusPct, regularBonusPct, workHours, otHours, nightHours, otherAllowances,
+        monthlyBonusRatio, monthlyBonus, monthlyBaseSalary, hourly, otHourly, otPay, nightPay, preTaxMonthly
+      };
+    }
+
+    // 이벤트 연결
+    inputs.forEach(inp => inp.addEventListener('input', calculate));
+
+    // 초기 계산
+    calculate();
+
+    // CSV 다운로드
+    qs('downloadCsv').addEventListener('click', ()=>{
+      const data = calculate();
+      const headers = ['항목','값'];
+      const rows = [
+        ['기본급 (원)', data.basicPay],
+        ['총 상여 (%)', data.totalBonusPct],
+        ['설/추석 상여 (%)', data.holidayBonusPct],
+        ['통상 상여 (%)', data.regularBonusPct],
+        ['월 소정 근로시간', data.workHours],
+        ['OT 시간', data.otHours],
+        ['야간 시간', data.nightHours],
+        ['기타수당 (원)', data.otherAllowances],
+        ['월 정기 상여 비율 (%)', (data.monthlyBonusRatio*100).toFixed(4)],
+        ['월 정기 상여금 (원)', data.monthlyBonus],
+        ['월 기본급여 (원)', data.monthlyBaseSalary],
+        ['시급 (원)', Math.round(data.hourly)],
+        ['OT 시급 (원)', Math.round(data.otHourly)],
+        ['OT 수당 (원)', Math.round(data.otPay)],
+        ['야간수당 (원)', Math.round(data.nightPay)],
+        ['세전 월 급여 (원)', data.preTaxMonthly]
+      ];
+
+      const csv = [headers.join(','), ...rows.map(r => r.map(String).map(s => '"'+s.replace(/"/g,'""')+'"').join(','))].join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'salary_calculation.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // 초기화
+    qs('resetBtn').addEventListener('click', ()=>{
+      qs('basicPay').value = 1910000;
+      qs('totalBonusPct').value = 800;
+      qs('holidayBonusPct').value = 80;
+      qs('regularBonusPct').value = 800;
+      qs('workHours').value = 179;
+      qs('otHours').value = 20;
+      qs('nightHours').value = 60;
+      qs('otherAllowances').value = 0;
+      calculate();
+    });
+  </script>
+</body>
+</html>
